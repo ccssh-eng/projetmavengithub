@@ -1,0 +1,63 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main  # Vous pouvez ajuster en fonction de votre branche principale
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # Vous pouvez aussi choisir un autre environnement en fonction de vos besoins
+
+    steps:
+      # Checkout du code source
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Configuration de Docker
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Connexion à Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Compilation de l'application (par exemple, pour un projet Node.js)
+      - name: Install dependencies
+        run: |
+          npm install  # Remplacez selon votre projet (par exemple, `mvn install` pour un projet Java)
+
+      # Test de l'application
+      - name: Run tests
+        run: |
+          npm test  # Remplacez par la commande de test appropriée
+
+      # Construction de l'image Docker
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/my-app:latest .
+
+      # Push de l'image Docker vers Docker Hub
+      - name: Push Docker image
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/my-app:latest
+
+  deploy:
+    runs-on: ubuntu-latest  # Sur le serveur avec Docker installé
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Déploiement sur le serveur Docker (exemple en utilisant SSH)
+      - name: Deploy to server
+        env:
+          DOCKER_HOST: "ssh://$SERVER_USER@$SERVER_IP"
+        run: |
+          ssh $SERVER_USER@$SERVER_IP "docker pull ${{ secrets.DOCKER_USERNAME }}/my-app:latest"
+          ssh $SERVER_USER@$SERVER_IP "docker stop my-app || true"
+          ssh $SERVER_USER@$SERVER_IP "docker rm my-app || true"
+          ssh $SERVER_USER@$SERVER_IP "docker run -d --name my-app -p 80:80 ${{ secrets.DOCKER_USERNAME }}/my-app:latest"
